@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Define error messages
+ERR_MSG1="The file /etc/sysconfig/iptables does not exist. Exiting."
+ERR_MSG2="Script execution stops on RHEL 7 systems. Exiting."
+
+# Check if the file /etc/sysconfig/iptables exists
+if [ ! -f /etc/sysconfig/iptables ]; then
+    echo "$ERR_MSG1"
+    exit 1
+fi
+
+# Determine the OS version
+OS_VERSION=$(grep -oE 'release [0-9]+' /etc/redhat-release | awk '{print $2}')
+
+if [ "$OS_VERSION" -eq 7 ]; then
+    echo "$ERR_MSG2"
+    exit 0
+elif [ "$OS_VERSION" -eq 8 ]; then
+    # Check if the file was last modified more than an hour ago
+    if [ $(find /etc/sysconfig/iptables -mmin +60) ]; then
+        # Get the current hour
+        CURRENT_HOUR=$(date +"%H")
+        
+        # Proceed only during 7 AM or 5 PM
+        if [ "$CURRENT_HOUR" -eq 7 ] || [ "$CURRENT_HOUR" -eq 17 ]; then
+            echo "Saving the current iptables configuration..."
+            iptables-save > /etc/sysconfig/iptables
+            echo "Configuration saved successfully."
+        else
+            echo "Script can only run during the hours of 7 AM or 5 PM. Exiting."
+            exit 1
+        fi
+    else
+        echo "The file /etc/sysconfig/iptables has been modified within the last hour. Exiting."
+        exit 1
+    fi
+else
+    echo "Unsupported RHEL version: $OS_VERSION. Exiting."
+    exit 1
+fi
